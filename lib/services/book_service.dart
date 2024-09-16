@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:booklisting_app_client/config.dart';
 import 'package:booklisting_app_client/entities/Author.dart';
@@ -61,6 +62,7 @@ Book bookFromJson(Map<String, dynamic> jsonMap)
 Map<String, dynamic> bookToJson(Book book)
 {
   return {
+    "id": book.id,
     "title": book.title,
     "links": book.bookLinks.map((link)=>
             {
@@ -76,6 +78,9 @@ class BookService
   static const _addBookUrl = "/api/books";
   static const _getAllBooksUrl = "/api/books";
   static const _coverImageUrl = "/api/files?path=";
+  static const _getBookUrl = "/api/books/";
+  static const _updateBookUrl = "/api/books";
+  static const _deleteBookUrl = "/api/books/";
 
   // method to add a book and return it
   static Future<Book> addBook({required Book book, required File coverImage, required String jwt}) async
@@ -194,6 +199,174 @@ class BookService
   static String getCoverImageUrl(String path)
   {
     return Config.baseUrl + _coverImageUrl +path;
+  }
+
+  // method to get a book by id
+  static Future<Book> getBookById({required int id, required String jwt}) async
+  {
+    final url = Uri.parse(Config.baseUrl+_getBookUrl+id.toString());
+
+    Response response;
+
+    try
+    {
+      response = await get(
+          url,
+          headers: {
+            "Authorization": "Bearer $jwt"
+          }
+      );
+    }
+    catch(e)
+    {
+      // failed to connect
+      throw CommunicationException();
+    }
+    if(response.statusCode==401)
+    {
+      // token expired
+      throw AuthenticationException();
+    }
+    else if(response.statusCode==404)
+    {
+      throw BookNotFoundException();
+    }
+    else if(response.statusCode!=200)
+    {
+      throw Exception();
+    }
+
+    Map<String, dynamic> bookJson = jsonDecode(response.body);
+
+    return bookFromJson(bookJson);
+  }
+
+  // method to update a book
+  static Future<Book> updateBook({required Book book, required String jwt, File? coverImage}) async
+  {
+    final url = Uri.parse(Config.baseUrl+_updateBookUrl);
+
+    // new multi part request
+    MultipartRequest request = MultipartRequest("PUT", url);
+    // headers
+    Map<String, String> headers = {
+      "Authorization": "Bearer $jwt",
+    };
+
+    // set fields in request
+    request.files.add(
+      MultipartFile.fromString(
+        'book',
+        jsonEncode(bookToJson(book)),
+        contentType: MediaType('application', 'json'),
+      ),
+    );
+    if(coverImage!=null)
+    {
+      request.files.add(
+        await MultipartFile.fromPath(
+          'cover_image',
+          coverImage.path,
+          contentType: MediaType('image', 'png'), // Update this if the image is a different type, like 'image/jpeg'
+        ),);
+    }
+    else
+      {
+        // add empty image field, since image is optional, but the field is mandatory
+        // content type will still be image/png
+        request.files.add(
+          MultipartFile.fromBytes(
+            'cover_image',
+            Uint8List(0),
+            filename: 'empty.jpg', // Placeholder file name
+            contentType: MediaType('image', 'png'),
+          ),
+        );
+      }
+
+    // add headers
+    request.headers.addAll(headers);
+    StreamedResponse streamedResponse;
+    try
+    {
+      streamedResponse = await request.send();
+    }
+    catch(e)
+    {
+      // failed to send
+      throw CommunicationException();
+    }
+
+    if(streamedResponse.statusCode==401)
+    {
+      // token has expired
+      throw AuthenticationException();
+    }
+    else if(streamedResponse.statusCode==404)
+    {
+      // book not found
+      throw BookNotFoundException();
+    }
+    else if (streamedResponse.statusCode==403)
+    {
+      // forbidden
+      throw ForbiddenException();
+    }
+    else if(streamedResponse.statusCode!=200)
+    {
+      // unknown exception at server
+      throw Exception();
+    }
+
+    // get the response obj
+    Response response = await Response.fromStream(streamedResponse);
+
+    // get book
+    Map<String, dynamic> bookJson = jsonDecode(response.body);
+
+    return bookFromJson(bookJson);
+  }
+
+  // method to delete a book
+  static Future<void> deleteBook({required int id, required String jwt}) async
+  {
+    final url = Uri.parse(Config.baseUrl+_deleteBookUrl+id.toString());
+
+    Response response;
+
+    try
+    {
+      response = await delete(
+          url,
+          headers: {
+            "Authorization": "Bearer $jwt"
+          }
+      );
+    }
+    catch(e)
+    {
+      // failed to connect
+      throw CommunicationException();
+    }
+    if(response.statusCode==401)
+    {
+      // token expired
+      throw AuthenticationException();
+    }
+    else if(response.statusCode==404)
+    {
+      throw BookNotFoundException();
+    }
+    else if (response.statusCode==403)
+    {
+      // forbidden
+      throw ForbiddenException();
+    }
+    else if(response.statusCode!=200)
+    {
+      throw Exception();
+    }
+
   }
 
 }

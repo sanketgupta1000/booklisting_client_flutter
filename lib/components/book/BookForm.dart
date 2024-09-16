@@ -17,17 +17,30 @@ class LinkController
   final TextEditingController linkValueController;
 }
 
-class AddBookForm extends StatefulWidget {
-  const AddBookForm({super.key, required this.addCallback, required this.cancelCallback});
+class BookForm extends StatefulWidget {
+  const BookForm({
+    super.key,
+    required this.addCallback,
+    required this.cancelCallback,
+    // is the form for editing a book
+    this.editMode = false,
+    // the data to be displayed in form
+    this.book = const Book(id: 0, title: '', author: Author(id: 0, email: "", fullName: ""), bookLinks: [], coverImagePath: '', )
 
-  final Future<void> Function({required Book book, required File coverImage}) addCallback;
+  });
+
+  final Future<void> Function({required Book book, File? coverImage}) addCallback;
   final VoidCallback cancelCallback;
 
+  final bool editMode;
+
+  final Book book;
+
   @override
-  State<AddBookForm> createState() => _AddBookFormState();
+  State<BookForm> createState() => _BookFormState();
 }
 
-class _AddBookFormState extends State<AddBookForm> {
+class _BookFormState extends State<BookForm> {
 
   // key of form
   final _formKey = GlobalKey<FormState>();
@@ -43,6 +56,26 @@ class _AddBookFormState extends State<AddBookForm> {
 
   // list of controllers for link
   List<LinkController> linkControllers = [];
+
+  // initialize state
+  @override
+  void initState() {
+    super.initState();
+    titleController.text = widget.book.title;
+    for(BookLink bl in widget.book.bookLinks)
+      {
+        // create a new link controller
+        LinkController lc = LinkController();
+        lc.linkNameController.text = bl.name;
+        String linkText = bl.link;
+        if(linkText.startsWith("https://"))
+        {
+          linkText = linkText.substring(8);
+        }
+        lc.linkValueController.text = linkText;
+        linkControllers.add(lc);
+      }
+  }
 
   @override
   void dispose() {
@@ -88,34 +121,34 @@ class _AddBookFormState extends State<AddBookForm> {
           TextFormField(
             readOnly: true,
             decoration: InputDecoration(
-              labelText: "Cover Image",
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.attach_file),
+                labelText: "Cover Image",
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.attach_file),
 
-                onPressed: () async
-                {
-                  FilePickerResult? result = await FilePicker.platform.pickFiles(
-                    allowedExtensions: ["jpg", "png", "jpeg", "bmp"],
-                    type: FileType.custom
-                  );
-
-                  if(result!=null)
+                  onPressed: () async
                   {
-                    // file selected
-                    // save in state
-                    setState(() {
-                      coverImage = File(result.files.single.path!);
-                    });
-                  }
+                    FilePickerResult? result = await FilePicker.platform.pickFiles(
+                        allowedExtensions: ["jpg", "png", "jpeg", "bmp"],
+                        type: FileType.custom
+                    );
 
-                },
+                    if(result!=null)
+                    {
+                      // file selected
+                      // save in state
+                      setState(() {
+                        coverImage = File(result.files.single.path!);
+                      });
+                    }
 
-              )
+                  },
+
+                )
             ),
 
             validator: (value)
             {
-              if(coverImage==null)
+              if((!widget.editMode) && (coverImage==null))
               {
                 return "Please select a file";
               }
@@ -181,6 +214,17 @@ class _AddBookFormState extends State<AddBookForm> {
                     ),
                   ),
 
+                  // button to remove link
+                  IconButton(
+                    icon: const Icon(Icons.remove),
+                    onPressed: ()
+                    {
+                      setState(() {
+                        linkControllers.remove(lc);
+                      });
+                    },
+                  )
+
                 ],
 
               );
@@ -223,13 +267,13 @@ class _AddBookFormState extends State<AddBookForm> {
                     Book book = Book(
                         id: 0,
                         title: titleController.text,
-                        author: Author(id: 0, email: "", fullName: ""),
+                        author: const Author(id: 0, email: "", fullName: ""),
                         bookLinks: links,
                         coverImagePath: ""
                     );
 
                     // valid, call the handler
-                    widget.addCallback(book: book, coverImage: coverImage!);
+                    widget.addCallback(book: book, coverImage: coverImage);
                   }
                 },
 
