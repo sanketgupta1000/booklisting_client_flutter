@@ -1,8 +1,10 @@
 import 'dart:io';
 
 import 'package:booklisting_app_client/components/book/BookCard.dart';
+import 'package:booklisting_app_client/components/book/BookForm.dart';
 import 'package:booklisting_app_client/exceptions/exceptions.dart';
 import 'package:booklisting_app_client/pages/AuthPage.dart';
+import 'package:booklisting_app_client/pages/BookPage.dart';
 import 'package:booklisting_app_client/services/book_service.dart';
 import 'package:booklisting_app_client/shared/simple_dialog.dart';
 import 'package:booklisting_app_client/shared/simple_loader.dart';
@@ -23,7 +25,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
 
   String? jwt;
-
+  String? email;
   // the list of books
   List<Book> books = [];
 
@@ -39,6 +41,8 @@ class _HomePageState extends State<HomePage> {
     // get jwt
     const storage = FlutterSecureStorage();
     String? jsonWt = await storage.read(key: "jwt");
+    // get email
+    String? jsonEmail = await storage.read(key: "email");
     List<Book> fetchedBooks;
     // get books
     try
@@ -62,6 +66,7 @@ class _HomePageState extends State<HomePage> {
       // set the state
       setState(() {
         jwt = jsonWt;
+        email = jsonEmail;
         books = fetchedBooks;
       });
 
@@ -115,6 +120,30 @@ class _HomePageState extends State<HomePage> {
 
       appBar: AppBar(
         title: const Text("Home"),
+        actions: [
+
+        //   logout button
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: ()
+            async {
+              const storage = FlutterSecureStorage();
+              // remove jwt
+              await storage.delete(key: "jwt");
+
+              if(context.mounted)
+              {
+                // navigate to auth page
+                Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (BuildContext ctx)
+                    {
+                      return const AuthPage();
+                    }));
+              }
+            },
+          )
+
+        ],
       ),
 
       body: isLoading?
@@ -128,7 +157,24 @@ class _HomePageState extends State<HomePage> {
       SingleChildScrollView(
         child: Column(
           children: books.map(
-              (book)=>BookCard(book: book, onTap:(){}, jwt: jwt!)
+              (book)=>BookCard(
+                book: book,
+                jwt: jwt!,
+                onTap:()
+                {
+                  // navigate to book page
+                  Navigator.of(context)
+                      .push(
+                    MaterialPageRoute(builder: (ctx){
+                      return BookPage(bookId: book.id, jwt: jwt!, email: email!);
+                    })
+                  )
+                  .then((value) {
+                    // fetch data again
+                    fetchData();
+                  });
+                },
+              )
           ).toList(),
         ),
       ),
@@ -165,10 +211,10 @@ class _HomePageState extends State<HomePage> {
 
             height: 500,
 
-            child: AddBookForm(
+            child: BookForm(
 
               // handler to call when adding
-              addCallback: ({required Book book, required File coverImage})
+              addCallback: ({required Book book, File? coverImage})
               async {
                 // show loading spinner
                 showSimpleLoader(context: context);
@@ -178,7 +224,7 @@ class _HomePageState extends State<HomePage> {
                 {
                   try
                   {
-                    await BookService.addBook(book: book, coverImage: coverImage, jwt: jwt!);
+                    await BookService.addBook(book: book, coverImage: coverImage!, jwt: jwt!);
                   }
                   catch(e)
                   {

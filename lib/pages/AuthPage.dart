@@ -52,13 +52,16 @@ class _AuthPageState extends State<AuthPage> with TickerProviderStateMixin {
             // order is important here
             LoginForm(
 
-              onSuccess: ({required String jwt})
-              {
+              onSuccess: ({required String jwt, required String email})
+              async {
                 // flutter secure storage
                 const storage = FlutterSecureStorage();
 
                 // save jwt
-                storage.write(key: "jwt", value: jwt);
+                await storage.write(key: "jwt", value: jwt);
+
+                // save the email
+                await storage.write(key: "email", value: email);
 
                 // redirect to home
                 Navigator.pushReplacement(

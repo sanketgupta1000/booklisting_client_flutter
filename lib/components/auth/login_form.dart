@@ -8,7 +8,7 @@ import 'package:booklisting_app_client/exceptions/exceptions.dart';
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key, required this.onSuccess});
 
-  final Function({required String jwt}) onSuccess;
+  final Function({required String jwt, required String email}) onSuccess;
 
   @override
   State<LoginForm> createState() => _LoginFormState();
@@ -137,7 +137,7 @@ class _LoginFormState extends State<LoginForm> {
                     }
 
                     // call onSuccess
-                    widget.onSuccess(jwt: jwt);
+                    widget.onSuccess(jwt: jwt, email: emailController.text);
 
                   }
                   on CommunicationException catch (e)
